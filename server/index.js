@@ -18,29 +18,22 @@ const stringOrDate = z.union([z.string(), z.date()]);
 const nullableStringOrDate = z.union([stringOrDate, z.null()]).optional();
 
 const baseRecordSchema = z
-  .object({
-    id: z.string().min(1).optional(),
-    fields: z.record(z.any()).optional(),
-  })
+  .object({ id: z.string().min(1).optional(), fields: z.record(z.any()).optional() })
   .passthrough();
 
 const employeeRecordSchema = baseRecordSchema
-  .extend({
-    employee_id: z.string().min(1).optional(),
-    employeeId: z.string().min(1).optional(),
-  })
+  .extend({ employee_id: z.string().min(1).optional(), employeeId: z.string().min(1).optional() })
   .passthrough()
-  .refine((value) => {
-    if (value.id && value.id.trim()) return true;
-    if (typeof value.employee_id === "string" && value.employee_id.trim()) return true;
-    if (typeof value.employeeId === "string" && value.employeeId.trim()) return true;
-    const fields = value.fields || {};
-    const hasId = Boolean(
-      (typeof fields.employee_id === "string" && fields.employee_id.trim()) ||
-        (typeof fields.employeeId === "string" && fields.employeeId.trim()) ||
-        (typeof fields.id === "string" && fields.id.trim()),
+  .refine((v) => {
+    if (v.id && v.id.trim()) return true;
+    if (typeof v.employee_id === "string" && v.employee_id.trim()) return true;
+    if (typeof v.employeeId === "string" && v.employeeId.trim()) return true;
+    const f = v.fields || {};
+    return Boolean(
+      (typeof f.employee_id === "string" && f.employee_id.trim()) ||
+        (typeof f.employeeId === "string" && f.employeeId.trim()) ||
+        (typeof f.id === "string" && f.id.trim()),
     );
-    return hasId;
   }, { message: "Employee record requires an id", path: ["id"] });
 
 const availabilityRecordSchema = baseRecordSchema
@@ -64,17 +57,16 @@ const shiftRecordSchema = baseRecordSchema
     assigned_employee: z.union([z.string(), z.null()]).optional(),
   })
   .passthrough()
-  .refine((value) => {
-    if (value.id && value.id.trim()) return true;
-    if (typeof value.shift_id === "string" && value.shift_id.trim()) return true;
-    if (typeof value.shiftId === "string" && value.shiftId.trim()) return true;
-    const fields = value.fields || {};
-    const hasId = Boolean(
-      (typeof fields.shift_id === "string" && fields.shift_id.trim()) ||
-        (typeof fields.shiftId === "string" && fields.shiftId.trim()) ||
-        (typeof fields.id === "string" && fields.id.trim()),
+  .refine((v) => {
+    if (v.id && v.id.trim()) return true;
+    if (typeof v.shift_id === "string" && v.shift_id.trim()) return true;
+    if (typeof v.shiftId === "string" && v.shiftId.trim()) return true;
+    const f = v.fields || {};
+    return Boolean(
+      (typeof f.shift_id === "string" && f.shift_id.trim()) ||
+        (typeof f.shiftId === "string" && f.shiftId.trim()) ||
+        (typeof f.id === "string" && f.id.trim()),
     );
-    return hasId;
   }, { message: "Shift record requires an id", path: ["shift_id"] });
 
 const assignmentRecordSchema = baseRecordSchema
@@ -107,7 +99,7 @@ function createApp() {
     next();
   });
 
-  app.use((req, res, next) => {
+  app.use((req, _res, next) => {
     const requestId = randomUUID();
     req.requestId = requestId;
     req.logger = logger.child ? logger.child({ requestId }) : logger;
@@ -115,19 +107,14 @@ function createApp() {
   });
 
   app.options("/generate-schedule", (req, res) => {
-    if (!ALLOW_ORIGIN) {
-      res.status(403).send("");
-      return;
-    }
+    if (!ALLOW_ORIGIN) return res.status(403).send("");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.setHeader("Access-Control-Max-Age", "600");
     res.status(204).send("");
   });
 
-  app.get("/health", (req, res) => {
-    res.json({ ok: true });
-  });
+  app.get("/health", (_req, res) => res.json({ ok: true }));
   app.get("/", (_req, res) => res.send("Server online"));
 
   app.post("/generate-schedule", async (req, res) => {
@@ -150,13 +137,14 @@ function createApp() {
 
       const result = schedule(shiftTemplate, employees, availability, existingAssignments);
       const validationErrors = validate(result.assignments, shiftTemplate, employees, availability);
+
       const combinedIssues = [
         ...result.issues,
-        ...validationErrors.map((error) => ({
-          shiftId: error.shiftId,
-          employeeId: error.employeeId,
-          reason: error.message,
-          type: error.type,
+        ...validationErrors.map((e) => ({
+          shiftId: e.shiftId,
+          employeeId: e.employeeId,
+          reason: e.message,
+          type: e.type,
         })),
       ];
 
@@ -173,9 +161,8 @@ function createApp() {
       if (ZAPIER_ENABLED && ZAPIER_WEBHOOK_URL) {
         try {
           zapierResult = await postSchedule(zapierPayload, { force: forcePost });
-        } catch (zapierError) {
-          const message =
-            zapierError && zapierError.message ? zapierError.message : String(zapierError);
+        } catch (err) {
+          const message = err && err.message ? err.message : String(err);
           console.error("Zapier webhook threw", JSON.stringify({ message }));
           zapierResult = { ok: false, status: 0, text: message };
         }
@@ -227,21 +214,17 @@ function createApp() {
             requestId: reqId,
             status: 400,
             error: "Invalid schedule request payload.",
-            validationErrors: error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              message: issue.message,
+            validationErrors: error.issues.map((i) => ({
+              path: i.path.join("."),
+              message: i.message,
             })),
           },
           "Failed to generate schedule",
         );
-        res.status(400).json({
+        return res.status(400).json({
           error: "Invalid schedule request payload.",
-          details: error.issues.map((issue) => ({
-            path: issue.path.join("."),
-            message: issue.message,
-          })),
+          details: error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         });
-        return;
       }
 
       requestLogger2.error(
@@ -257,7 +240,7 @@ function createApp() {
     }
   });
 
-  app.use((err, req, res, next) => {
+  app.use((err, req, res, _next) => {
     const status = err && Number.isFinite(err.statusCode) ? err.statusCode : 500;
     const message = err && err.message ? err.message : "Unexpected error";
     const reqId = (req && req.requestId) || randomUUID();
@@ -265,15 +248,12 @@ function createApp() {
 
     if (status >= 500) {
       requestLogger3.error({ requestId: reqId, status, error: message }, "Unhandled error");
-      res.status(500).json({ error: "Unable to process request." });
-      return;
+      return res.status(500).json({ error: "Unable to process request." });
     }
     res.status(status).json({ error: message });
   });
 
-  app.use((req, res) => {
-    res.status(404).json({ error: "Not Found" });
-  });
+  app.use((_req, res) => res.status(404).json({ error: "Not Found" }));
 
   return app;
 }
