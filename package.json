@@ -1,0 +1,20 @@
+{
+  "name": "ai-home-plus-scheduler",
+  "version": "1.0.0",
+  "description": "Scheduling utilities and lightweight API server for A Home Plus",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "hit:zap": "node scripts/hitZapier.js 2025-W42 2025-10-13 2025-10-27"
+  },
+  "type": "commonjs",
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pino": "^8.17.0",
+    "zod": "^3.23.8"
+  }
+}

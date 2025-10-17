@@ -1,0 +1,23 @@
+[
+  {
+    "id": "emp_alice",
+    "name": "Alice Nguyen",
+    "role": "CNA",
+    "status": "Active",
+    "weekly_cap": 40
+  },
+  {
+    "id": "emp_bob",
+    "name": "Bob Smith",
+    "role": "CMA",
+    "status": "Active",
+    "weekly_cap": 40
+  },
+  {
+    "id": "emp_cara",
+    "name": "Cara Lopez",
+    "role": "CNA",
+    "status": "Active",
+    "weekly_cap": 32
+  }
+]

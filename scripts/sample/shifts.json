@@ -1,0 +1,30 @@
+[
+  {
+    "shift_id": "shift_day_cna_mon",
+    "date": "2024-08-12",
+    "role_needed": "CNA",
+    "start_time": "07:00",
+    "end_time": "15:00"
+  },
+  {
+    "shift_id": "shift_day_cma_mon",
+    "date": "2024-08-12",
+    "role_needed": "CMA",
+    "start_time": "08:00",
+    "end_time": "16:00"
+  },
+  {
+    "shift_id": "shift_night_either",
+    "date": "2024-08-12",
+    "role_needed": "Either",
+    "start_time": "19:00",
+    "end_time": "07:00"
+  },
+  {
+    "shift_id": "shift_day_cna_tue",
+    "date": "2024-08-13",
+    "role_needed": "CNA",
+    "start_time": "07:00",
+    "end_time": "15:00"
+  }
+]
