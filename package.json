@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "description": "Scheduling utilities and lightweight API server for A Home Plus",
   "main": "server/index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "test": "node --test \"tests/**/*.test.js\"",
     "hit:zap": "node scripts/hitZapier.js 2025-W42 2025-10-13 2025-10-27"
   },
-  "type": "commonjs",
+  "engines": {
+    "node": "20.x"
+  },
   "keywords": [],
   "author": "",
   "license": "MIT",
