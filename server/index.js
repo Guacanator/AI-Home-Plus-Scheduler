@@ -140,6 +140,7 @@ function createApp() {
   app.get("/health", (req, res) => {
     res.json({ ok: true });
   });
+app.get("/", (_req, res) => res.send("Server online"));
 
   app.post("/generate-schedule", async (req, res) => {
     const requestId = req.requestId || randomUUID();
