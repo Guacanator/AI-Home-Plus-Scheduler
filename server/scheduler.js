@@ -1,11 +1,20 @@
 "use strict";
 
+// role helpers
+const norm = (s) => String(s || "").trim().toUpperCase();
+const accepts = (empRole, roleNeeded) => {
+  const e = norm(empRole);
+  const r = norm(roleNeeded);
+  if (e === r) return true;
+  if (r === "CNA_OR_CMA") return e === "CNA" || e === "CMA";
+  return false;
+};
+
 const {
   normalizeEmployees,
   normalizeAvailability,
   normalizeShiftRecords,
   normalizeAssignments,
-  roleMatches,
 } = require("./utils/data");
 const { overlaps } = require("./utils/time");
 
@@ -25,34 +34,35 @@ function summarizeTotals(employeeMap, totals, blocks) {
 }
 
 function coverageForShift(windows = [], shiftStart, shiftEnd) {
-  if (!shiftStart || !shiftEnd) {
-    return { available: false, preferred: false };
-  }
+  if (!shiftStart || !shiftEnd) return { available: false, preferred: false };
+
   let hasCoverage = false;
   let hasPreferred = false;
+
   windows.forEach((window) => {
-    if (!window.start || !window.end) {
-      return;
-    }
+    if (!window.start || !window.end) return;
+
     const start = window.start.getTime();
     const end = window.end.getTime();
     const shiftStartMs = shiftStart.getTime();
     let shiftEndMs = shiftEnd.getTime();
-    if (shiftEndMs <= shiftStartMs) {
-      shiftEndMs += 24 * 60 * 60 * 1000;
-    }
+    if (shiftEndMs <= shiftStartMs) shiftEndMs += 24 * 60 * 60 * 1000;
 
     if (start <= shiftStartMs && end >= shiftEndMs) {
       hasCoverage = true;
-      if (window.preferred) {
-        hasPreferred = true;
-      }
+      if (window.preferred) hasPreferred = true;
     }
   });
+
   return { available: hasCoverage, preferred: hasPreferred };
 }
 
-function schedule(shiftTemplate = [], employees = [], availability = [], existingAssignments = []) {
+function schedule(
+  shiftTemplate = [],
+  employees = [],
+  availability = [],
+  existingAssignments = []
+) {
   const employeeMap = normalizeEmployees(employees);
   const availabilityMap = normalizeAvailability(availability);
   const shifts = normalizeShiftRecords(shiftTemplate);
@@ -66,9 +76,7 @@ function schedule(shiftTemplate = [], employees = [], availability = [], existin
   function trackAssignment(employeeId, shift) {
     const hours = shift.hours || 0;
     totals.set(employeeId, (totals.get(employeeId) || 0) + hours);
-    if (!blocks.has(employeeId)) {
-      blocks.set(employeeId, []);
-    }
+    if (!blocks.has(employeeId)) blocks.set(employeeId, []);
     blocks.get(employeeId).push({ start: shift.start, end: shift.end, shiftId: shift.id });
   }
 
@@ -83,15 +91,19 @@ function schedule(shiftTemplate = [], employees = [], availability = [], existin
       return;
     }
 
+    // Normalize needed role once
+    const needed = norm(shift.roleNeeded || shift.role_needed || "");
+
     if (existingEmployeeId) {
       const employee = employeeMap.get(existingEmployeeId);
       const coverage = availabilityMap.get(existingEmployeeId) || [];
       const coverageResult = coverageForShift(coverage, shift.start, shift.end);
       const currentHours = totals.get(existingEmployeeId) || 0;
+
       const canAssign =
         employee &&
         employee.status === "active" &&
-        roleMatches(employee.role, shift.roleNeeded) &&
+        accepts(employee.role, needed) &&
         coverageResult.available &&
         currentHours + shiftHours <= employee.weeklyCap &&
         !overlaps(blocks.get(existingEmployeeId), shift.start, shift.end);
@@ -109,12 +121,12 @@ function schedule(shiftTemplate = [], employees = [], availability = [], existin
       });
     }
 
-    const activeEmployees = Array.from(employeeMap.values()).filter((employee) => {
-      return employee.status === "active" && roleMatches(employee.role, shift.roleNeeded);
-    });
+    const activeEmployees = Array.from(employeeMap.values()).filter(
+      (employee) => employee.status === "active" && accepts(employee.role, needed)
+    );
 
     if (activeEmployees.length === 0) {
-      const reason = `No employees available for role ${shift.roleNeeded || "Either"}.`;
+      const reason = `No employees available for role ${needed || "Either"}.`;
       assignments.push({ shiftId: shift.id, employeeId: null, reason });
       issues.push({ shiftId: shift.id, reason });
       return;
@@ -158,20 +170,15 @@ function schedule(shiftTemplate = [], employees = [], availability = [], existin
       return;
     }
 
+    // tie-break: preferred coverage, then lowest hours, then fewest assignments, then name
     withoutConflicts.sort((a, b) => {
-      if (a.coverage.preferred !== b.coverage.preferred) {
-        return a.coverage.preferred ? -1 : 1;
-      }
+      if (a.coverage.preferred !== b.coverage.preferred) return a.coverage.preferred ? -1 : 1;
       const hoursA = totals.get(a.employee.id) || 0;
       const hoursB = totals.get(b.employee.id) || 0;
-      if (hoursA !== hoursB) {
-        return hoursA - hoursB;
-      }
-      const assignmentsA = (blocks.get(a.employee.id) || []).length;
-      const assignmentsB = (blocks.get(b.employee.id) || []).length;
-      if (assignmentsA !== assignmentsB) {
-        return assignmentsA - assignmentsB;
-      }
+      if (hoursA !== hoursB) return hoursA - hoursB;
+      const assignsA = (blocks.get(a.employee.id) || []).length;
+      const assignsB = (blocks.get(b.employee.id) || []).length;
+      if (assignsA !== assignsB) return assignsA - assignsB;
       return (a.employee.name || "").localeCompare(b.employee.name || "");
     });
 
@@ -187,6 +194,4 @@ function schedule(shiftTemplate = [], employees = [], availability = [], existin
   };
 }
 
-module.exports = {
-  schedule,
-};
+module.exports = { schedule };
