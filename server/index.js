@@ -31,15 +31,9 @@ const employeeRecordSchema = baseRecordSchema
   })
   .passthrough()
   .refine((value) => {
-    if (value.id && value.id.trim()) {
-      return true;
-    }
-    if (typeof value.employee_id === "string" && value.employee_id.trim()) {
-      return true;
-    }
-    if (typeof value.employeeId === "string" && value.employeeId.trim()) {
-      return true;
-    }
+    if (value.id && value.id.trim()) return true;
+    if (typeof value.employee_id === "string" && value.employee_id.trim()) return true;
+    if (typeof value.employeeId === "string" && value.employeeId.trim()) return true;
     const fields = value.fields || {};
     const hasId = Boolean(
       (typeof fields.employee_id === "string" && fields.employee_id.trim()) ||
@@ -71,15 +65,9 @@ const shiftRecordSchema = baseRecordSchema
   })
   .passthrough()
   .refine((value) => {
-    if (value.id && value.id.trim()) {
-      return true;
-    }
-    if (typeof value.shift_id === "string" && value.shift_id.trim()) {
-      return true;
-    }
-    if (typeof value.shiftId === "string" && value.shiftId.trim()) {
-      return true;
-    }
+    if (value.id && value.id.trim()) return true;
+    if (typeof value.shift_id === "string" && value.shift_id.trim()) return true;
+    if (typeof value.shiftId === "string" && value.shiftId.trim()) return true;
     const fields = value.fields || {};
     const hasId = Boolean(
       (typeof fields.shift_id === "string" && fields.shift_id.trim()) ||
@@ -140,7 +128,7 @@ function createApp() {
   app.get("/health", (req, res) => {
     res.json({ ok: true });
   });
-app.get("/", (_req, res) => res.send("Server online"));
+  app.get("/", (_req, res) => res.send("Server online"));
 
   app.post("/generate-schedule", async (req, res) => {
     const requestId = req.requestId || randomUUID();
@@ -229,12 +217,14 @@ app.get("/", (_req, res) => res.send("Server online"));
         zapier: responseZapier,
       });
     } catch (error) {
-      const requestLogger = req.logger || logger;
+      const reqId = (req && req.requestId) || randomUUID();
+      const requestLogger2 = (req && req.logger) || logger;
       const isZodError = error && Array.isArray(error.issues);
+
       if (isZodError) {
-        requestLogger.error(
+        requestLogger2.error(
           {
-            requestId,
+            requestId: reqId,
             status: 400,
             error: "Invalid schedule request payload.",
             validationErrors: error.issues.map((issue) => ({
@@ -254,9 +244,9 @@ app.get("/", (_req, res) => res.send("Server online"));
         return;
       }
 
-      requestLogger.error(
+      requestLogger2.error(
         {
-          requestId,
+          requestId: reqId,
           status: 500,
           error: error && error.message ? error.message : "Unable to process request.",
           stack: error && error.stack ? error.stack : undefined,
@@ -270,15 +260,14 @@ app.get("/", (_req, res) => res.send("Server online"));
   app.use((err, req, res, next) => {
     const status = err && Number.isFinite(err.statusCode) ? err.statusCode : 500;
     const message = err && err.message ? err.message : "Unexpected error";
-    const requestId = req && req.requestId ? req.requestId : randomUUID();
-    const requestLogger = req && req.logger ? req.logger : logger;
+    const reqId = (req && req.requestId) || randomUUID();
+    const requestLogger3 = (req && req.logger) || logger;
 
     if (status >= 500) {
-      requestLogger.error({ requestId, status, error: message }, "Unhandled error");
+      requestLogger3.error({ requestId: reqId, status, error: message }, "Unhandled error");
       res.status(500).json({ error: "Unable to process request." });
       return;
     }
-
     res.status(status).json({ error: message });
   });
 
