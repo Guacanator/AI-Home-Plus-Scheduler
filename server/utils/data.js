@@ -6,30 +6,22 @@ const DEFAULT_WEEKLY_CAP = 40;
 
 function readField(record, keys) {
   for (const key of keys) {
-    if (record && Object.prototype.hasOwnProperty.call(record, key)) {
-      return record[key];
-    }
+    if (record && Object.prototype.hasOwnProperty.call(record, key)) return record[key];
   }
   const fields = record && record.fields;
-  if (!fields) {
-    return undefined;
-  }
+  if (!fields) return undefined;
   for (const key of keys) {
-    if (fields && Object.prototype.hasOwnProperty.call(fields, key)) {
-      return fields[key];
-    }
+    if (Object.prototype.hasOwnProperty.call(fields, key)) return fields[key];
   }
   return undefined;
 }
 
 function normalizeEmployees(records = []) {
   const map = new Map();
-
   records.forEach((record) => {
     const id = readField(record, ["id", "employee_id", "employeeId"]);
-    if (!id) {
-      return;
-    }
+    if (!id) return;
+
     const role = String(readField(record, ["role"]) || "").trim().toUpperCase();
     const status = String(readField(record, ["status"]) || "Active").trim().toLowerCase();
     const weeklyCapRaw = readField(record, ["weekly_cap", "weeklyCap", "Weekly Cap"]);
@@ -40,12 +32,12 @@ function normalizeEmployees(records = []) {
       name: readField(record, ["name", "Name"]) || "",
       role,
       status,
-      weeklyCap: Number.isFinite(weeklyCapNumber) && weeklyCapNumber > 0
-        ? weeklyCapNumber
-        : DEFAULT_WEEKLY_CAP,
+      weeklyCap:
+        Number.isFinite(weeklyCapNumber) && weeklyCapNumber > 0
+          ? weeklyCapNumber
+          : DEFAULT_WEEKLY_CAP,
     });
   });
-
   return map;
 }
 
@@ -54,6 +46,7 @@ function normalizeAvailability(records = []) {
 
   records.forEach((record) => {
     const fields = record && record.fields ? record.fields : record;
+
     const employeeField = readField(fields, [
       "employee_id",
       "employee",
@@ -68,15 +61,11 @@ function normalizeAvailability(records = []) {
       ? [employeeField]
       : [];
 
-    if (employeeIds.length === 0) {
-      return;
-    }
+    if (employeeIds.length === 0) return;
 
     const typeRaw = readField(fields, ["type", "Type"]) || "Available";
     const type = String(typeRaw).trim().toLowerCase();
-    if (type === "unavailable") {
-      return;
-    }
+    if (type === "unavailable") return;
 
     const dateValue = readField(fields, ["date", "Date"]);
     const startValue = readField(fields, ["start_time", "start", "Start"]);
@@ -85,15 +74,10 @@ function normalizeAvailability(records = []) {
     const start = combineDateTime(dateValue, startValue);
     const end = combineDateTime(dateValue, endValue);
     const range = normalizeRange(start, end);
-
-    if (!range.start || !range.end) {
-      return;
-    }
+    if (!range.start || !range.end) return;
 
     employeeIds.forEach((employeeId) => {
-      if (!availability.has(employeeId)) {
-        availability.set(employeeId, []);
-      }
+      if (!availability.has(employeeId)) availability.set(employeeId, []);
       availability.get(employeeId).push({
         start: range.start,
         end: range.end,
@@ -111,12 +95,12 @@ function normalizeShiftRecords(records = []) {
     .map((record) => {
       const fields = record && record.fields ? record.fields : record;
       const id = readField(record, ["id", "shift_id", "Shift Id", "shiftId"]);
-      if (!id) {
-        return null;
-      }
+      if (!id) return null;
 
       const roleRaw = readField(fields, ["role_needed", "role", "Role"]);
-      const roleNeeded = String(roleRaw || "Either").trim().toUpperCase();
+      // Normalize; treat "Either" as no specific requirement
+      let roleNeeded = String(roleRaw || "Either").trim().toUpperCase();
+      if (roleNeeded === "EITHER") roleNeeded = "";
 
       const dateValue = readField(fields, ["date", "Date"]);
       const startValue = readField(fields, ["start_time", "start", "Start"]);
@@ -142,17 +126,11 @@ function normalizeShiftRecords(records = []) {
 function roleMatches(empRole, roleNeeded) {
   const e = String(empRole || "").trim().toUpperCase();
   const r = String(roleNeeded || "").trim().toUpperCase();
-  if (!r) return true;                // no requirement ⇒ any role ok
-  if (e === r) return true;           // exact match
-  if (r === "CNA_OR_CMA") return e === "CNA" || e === "CMA";  // either role ok
+  if (!r) return true;                    // no requirement ⇒ any role ok
+  if (e === r) return true;               // exact match
+  if (r === "CNA_OR_CMA") return e === "CNA" || e === "CMA"; // either role ok
   return false;
 }
-
-module.exports = {
-  // …keep existing exports…
-  roleMatches,
-};
-
 
 function normalizeAssignments(records = []) {
   const map = new Map();
@@ -160,17 +138,13 @@ function normalizeAssignments(records = []) {
     records.forEach((record) => {
       const shiftId = readField(record, ["shift_id", "shiftId", "id"]);
       const employeeId = readField(record, ["employee_id", "employeeId", "assigned_employee"]);
-      if (shiftId && employeeId) {
-        map.set(shiftId, employeeId);
-      }
+      if (shiftId && employeeId) map.set(shiftId, employeeId);
     });
     return map;
   }
   if (records && typeof records === "object") {
     Object.entries(records).forEach(([shiftId, employeeId]) => {
-      if (shiftId && employeeId) {
-        map.set(shiftId, employeeId);
-      }
+      if (shiftId && employeeId) map.set(shiftId, employeeId);
     });
   }
   return map;
@@ -192,12 +166,8 @@ function buildDateFilter(fieldName, range = {}) {
       clauses.push(`IS_BEFORE({${fieldName}}, DATEADD('${iso}', 1, 'day'))`);
     }
   }
-  if (clauses.length === 0) {
-    return undefined;
-  }
-  if (clauses.length === 1) {
-    return clauses[0];
-  }
+  if (clauses.length === 0) return undefined;
+  if (clauses.length === 1) return clauses[0];
   return `AND(${clauses.join(", ")})`;
 }
 
