@@ -4,6 +4,7 @@ const {
   normalizeEmployees,
   normalizeAvailability,
   normalizeShiftRecords,
+  roleMatches,
 } = require("./utils/data");
 const { overlaps } = require("./utils/time");
 
@@ -23,10 +24,7 @@ function validate(assignments = [], shifts = [], employees = [], availability = 
   assignments.forEach((assignment) => {
     const shiftId = assignment.shiftId || assignment.shift_id;
     const employeeId = assignment.employeeId || assignment.employee_id;
-
-    if (!shiftId || !employeeId) {
-      return;
-    }
+    if (!shiftId || !employeeId) return;
 
     const shift = shiftMap.get(shiftId);
     const employee = employeeMap.get(employeeId);
@@ -60,28 +58,26 @@ function validate(assignments = [], shifts = [], employees = [], availability = 
       });
     }
 
-    if (shift.roleNeeded !== "EITHER" && employee.role !== shift.roleNeeded) {
+    // Role validation: accept CNA_OR_CMA and normalized roles
+    if (!roleMatches(employee.role, shift.roleNeeded)) {
       errors.push({
         type: "role_mismatch",
         shiftId,
         employeeId,
-        message: `${employee.name || employeeId} does not match required role ${shift.roleNeeded}.`,
+        message: `${employee.name || employeeId} does not match required role ${shift.roleNeeded || "Either"}.`,
       });
     }
 
+    // Availability coverage (full coverage of shift window)
     const windows = availabilityMap.get(employeeId) || [];
     const hasCoverage = windows.some((window) => {
-      if (!window.start || !window.end || !shift.start || !shift.end) {
-        return false;
-      }
+      if (!window.start || !window.end || !shift.start || !shift.end) return false;
       const start = window.start.getTime();
       const end = window.end.getTime();
-      const shiftStart = shift.start.getTime();
-      let shiftEnd = shift.end.getTime();
-      if (shiftEnd <= shiftStart) {
-        shiftEnd += 24 * 60 * 60 * 1000;
-      }
-      return start <= shiftStart && end >= shiftEnd;
+      const s0 = shift.start.getTime();
+      let s1 = shift.end.getTime();
+      if (s1 <= s0) s1 += 24 * 60 * 60 * 1000; // overnight shift
+      return start <= s0 && end >= s1;
     });
 
     if (!hasCoverage) {
@@ -96,16 +92,11 @@ function validate(assignments = [], shifts = [], employees = [], availability = 
     const hours = shift.hours || 0;
     hoursByEmployee.set(employeeId, (hoursByEmployee.get(employeeId) || 0) + hours);
 
-    if (!blocksByEmployee.has(employeeId)) {
-      blocksByEmployee.set(employeeId, []);
-    }
-    blocksByEmployee.get(employeeId).push({
-      start: shift.start,
-      end: shift.end,
-      shiftId,
-    });
+    if (!blocksByEmployee.has(employeeId)) blocksByEmployee.set(employeeId, []);
+    blocksByEmployee.get(employeeId).push({ start: shift.start, end: shift.end, shiftId });
   });
 
+  // Weekly cap
   for (const [employeeId, hours] of hoursByEmployee.entries()) {
     const employee = employeeMap.get(employeeId);
     if (employee && hours > employee.weeklyCap) {
@@ -117,6 +108,7 @@ function validate(assignments = [], shifts = [], employees = [], availability = 
     }
   }
 
+  // Overlaps
   for (const [employeeId, blocks] of blocksByEmployee.entries()) {
     const employee = employeeMap.get(employeeId);
     for (let i = 0; i < blocks.length; i += 1) {
@@ -136,6 +128,4 @@ function validate(assignments = [], shifts = [], employees = [], availability = 
   return errors;
 }
 
-module.exports = {
-  validate,
-};
+module.exports = { validate };
