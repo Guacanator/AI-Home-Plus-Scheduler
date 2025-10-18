@@ -138,15 +138,21 @@ function normalizeShiftRecords(records = []) {
     .filter(Boolean);
 }
 
-function roleMatches(employeeRole, roleNeeded) {
-  if (!roleNeeded || roleNeeded === "EITHER") {
-    return true;
-  }
-  if (!employeeRole) {
-    return false;
-  }
-  return employeeRole.toUpperCase() === roleNeeded.toUpperCase();
+// role matcher used by scheduler and validator
+function roleMatches(empRole, roleNeeded) {
+  const e = String(empRole || "").trim().toUpperCase();
+  const r = String(roleNeeded || "").trim().toUpperCase();
+  if (!r) return true;                // no requirement ⇒ any role ok
+  if (e === r) return true;           // exact match
+  if (r === "CNA_OR_CMA") return e === "CNA" || e === "CMA";  // either role ok
+  return false;
 }
+
+module.exports = {
+  // …keep existing exports…
+  roleMatches,
+};
+
 
 function normalizeAssignments(records = []) {
   const map = new Map();
