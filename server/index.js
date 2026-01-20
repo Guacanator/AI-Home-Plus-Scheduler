@@ -257,6 +257,24 @@ function createApp() {
 
   return app;
 }
+app.post("/run-week", async (req, res) => {
+  try {
+    const { week_id, house } = req.body;
+
+    if (!week_id) {
+      return res.status(400).json({ error: "week_id is required" });
+    }
+
+    res.json({
+      ok: true,
+      message: "run-week endpoint reached",
+      received: { week_id, house }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
 
 function createServer() {
   const app = createApp();
