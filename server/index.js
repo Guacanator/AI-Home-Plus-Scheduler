@@ -24,17 +24,20 @@ const baseRecordSchema = z
 const employeeRecordSchema = baseRecordSchema
   .extend({ employee_id: z.string().min(1).optional(), employeeId: z.string().min(1).optional() })
   .passthrough()
-  .refine((v) => {
-    if (v.id && v.id.trim()) return true;
-    if (typeof v.employee_id === "string" && v.employee_id.trim()) return true;
-    if (typeof v.employeeId === "string" && v.employeeId.trim()) return true;
-    const f = v.fields || {};
-    return Boolean(
-      (typeof f.employee_id === "string" && f.employee_id.trim()) ||
-        (typeof f.employeeId === "string" && f.employeeId.trim()) ||
-        (typeof f.id === "string" && f.id.trim()),
-    );
-  }, { message: "Employee record requires an id", path: ["id"] });
+  .refine(
+    (v) => {
+      if (v.id && v.id.trim()) return true;
+      if (typeof v.employee_id === "string" && v.employee_id.trim()) return true;
+      if (typeof v.employeeId === "string" && v.employeeId.trim()) return true;
+      const f = v.fields || {};
+      return Boolean(
+        (typeof f.employee_id === "string" && f.employee_id.trim()) ||
+          (typeof f.employeeId === "string" && f.employeeId.trim()) ||
+          (typeof f.id === "string" && f.id.trim()),
+      );
+    },
+    { message: "Employee record requires an id", path: ["id"] },
+  );
 
 const availabilityRecordSchema = baseRecordSchema
   .extend({
@@ -57,17 +60,20 @@ const shiftRecordSchema = baseRecordSchema
     assigned_employee: z.union([z.string(), z.null()]).optional(),
   })
   .passthrough()
-  .refine((v) => {
-    if (v.id && v.id.trim()) return true;
-    if (typeof v.shift_id === "string" && v.shift_id.trim()) return true;
-    if (typeof v.shiftId === "string" && v.shiftId.trim()) return true;
-    const f = v.fields || {};
-    return Boolean(
-      (typeof f.shift_id === "string" && f.shift_id.trim()) ||
-        (typeof f.shiftId === "string" && f.shiftId.trim()) ||
-        (typeof f.id === "string" && f.id.trim()),
-    );
-  }, { message: "Shift record requires an id", path: ["shift_id"] });
+  .refine(
+    (v) => {
+      if (v.id && v.id.trim()) return true;
+      if (typeof v.shift_id === "string" && v.shift_id.trim()) return true;
+      if (typeof v.shiftId === "string" && v.shiftId.trim()) return true;
+      const f = v.fields || {};
+      return Boolean(
+        (typeof f.shift_id === "string" && f.shift_id.trim()) ||
+          (typeof f.shiftId === "string" && f.shiftId.trim()) ||
+          (typeof f.id === "string" && f.id.trim()),
+      );
+    },
+    { message: "Shift record requires an id", path: ["shift_id"] },
+  );
 
 const assignmentRecordSchema = baseRecordSchema
   .extend({
@@ -116,6 +122,26 @@ function createApp() {
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
   app.get("/", (_req, res) => res.send("Server online"));
+
+  // FIX: /run-week must be defined inside createApp (so `app` exists)
+  app.post("/run-week", async (req, res) => {
+    try {
+      const { week_id, house } = req.body || {};
+
+      if (!week_id) {
+        return res.status(400).json({ error: "week_id is required" });
+      }
+
+      return res.json({
+        ok: true,
+        message: "run-week endpoint reached",
+        received: { week_id, house: house || null },
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "internal error" });
+    }
+  });
 
   app.post("/generate-schedule", async (req, res) => {
     const requestId = req.requestId || randomUUID();
@@ -193,7 +219,7 @@ function createApp() {
         "Generated schedule",
       );
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         week_id: weekId,
         start_date: startDate,
@@ -236,7 +262,7 @@ function createApp() {
         },
         "Failed to generate schedule",
       );
-      res.status(500).json({ error: "Unable to process request." });
+      return res.status(500).json({ error: "Unable to process request." });
     }
   });
 
@@ -250,31 +276,13 @@ function createApp() {
       requestLogger3.error({ requestId: reqId, status, error: message }, "Unhandled error");
       return res.status(500).json({ error: "Unable to process request." });
     }
-    res.status(status).json({ error: message });
+    return res.status(status).json({ error: message });
   });
 
   app.use((_req, res) => res.status(404).json({ error: "Not Found" }));
 
   return app;
 }
-app.post("/run-week", async (req, res) => {
-  try {
-    const { week_id, house } = req.body;
-
-    if (!week_id) {
-      return res.status(400).json({ error: "week_id is required" });
-    }
-
-    res.json({
-      ok: true,
-      message: "run-week endpoint reached",
-      received: { week_id, house }
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "internal error" });
-  }
-});
 
 function createServer() {
   const app = createApp();
