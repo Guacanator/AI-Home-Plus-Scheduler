@@ -10,6 +10,7 @@ const { validate } = require("./validator");
 const { ZAPIER_ENABLED, ZAPIER_WEBHOOK_URL } = require("./config");
 const { postSchedule } = require("./zapierClient");
 const { ScheduleRequest } = require("./schemas");
+const { runWeek } = require("./runWeek");
 
 const PORT = Number.parseInt(process.env.PORT || "3000", 10);
 const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN ? process.env.ALLOW_ORIGIN.trim() : "";
@@ -124,24 +125,29 @@ function createApp() {
   app.get("/", (_req, res) => res.send("Server online"));
 
   // FIX: /run-week must be defined inside createApp (so `app` exists)
-  app.post("/run-week", async (req, res) => {
-    try {
-      const { week_id, house } = req.body || {};
-
-      if (!week_id) {
-        return res.status(400).json({ error: "week_id is required" });
-      }
-
-      return res.json({
-        ok: true,
-        message: "run-week endpoint reached",
-        received: { week_id, house: house || null },
+app.post("/run-week", async (req, res) => {
+  try {
+    const { week_id, start_date, end_date, house } = req.body || {};
+ 
+    if (!week_id || !start_date || !end_date) {
+      return res.status(400).json({
+        error: "week_id, start_date, and end_date are required",
+        example: {
+          week_id: "W2026-11",
+          start_date: "2026-03-16",
+          end_date: "2026-03-29",
+          house: "House A",   // optional — omit for both houses
+        },
       });
-    } catch (err) {
-      console.error(err);
-      return res.status(500).json({ error: "internal error" });
     }
-  });
+ 
+    const result = await runWeek({ week_id, start_date, end_date, house: house || null });
+    return res.json(result);
+  } catch (err) {
+    console.error("[/run-week]", err);
+    return res.status(500).json({ error: err.message || "internal error" });
+  }
+});
 
   app.post("/generate-schedule", async (req, res) => {
     const requestId = req.requestId || randomUUID();
